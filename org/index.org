@@ -1,0 +1,13 @@
+#+TITLE:  Emacs Notes
+#+AUTHOR: John Hooks
+#+EMAIL:  john@bitmachina.com
+#+DATE:   <2017-07-19 Wed>
+
+** About
+   Loney developer seeking the perfect JavaScript editor.
+
+** Posts
+   - [[file:emacs/syntax.org][Emacs Syntax]] - Propertization of Complex Language Syntax
+   - [[file:emacs/fontification.org][Emacs Fontification]] - Beyond Basic Fontification
+   - [[file:emacs/javascript-fontification.org][JavaScript Fontification in Emacs]] - Parsing Template Strings
+

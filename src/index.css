@@ -1,0 +1,72 @@
+/* == @import "../node_modules/normalize.css/normalize.css"; */
+@import "normalize.css";
+@import "./zenburn.css";
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#content {
+    margin-right: auto;
+    margin-left: auto;
+    max-width: calc(800px - (30px));
+    padding-right: 1em;
+    padding-left: 1em;
+}
+
+#preamble {
+    margin-right: auto;
+    margin-left: auto;
+    max-width: calc(800px - (30px));
+    padding-right: 1em;
+    padding-left: 1em;
+}
+
+#postamble {
+    margin-right: auto;
+    margin-left: auto;
+    max-width: calc(800px - (30px));
+    /* top | right | bottom | left */
+    padding: 1.5em 1em 0 1em;
+}
+
+#postamble p {
+    padding: 0;
+    margin: 0;
+    color: #454545;
+    line-height: 1.25em;
+}
+
+#nav {
+    padding-top: 1.5em;
+}
+
+.org-src-container {
+    
+}
+
+.src {
+    font-size: .9em;
+    overflow-x: auto;
+}
+ 
+p, li {
+    line-height: 1.5em;
+}
+
+li {
+    padding-bottom: 0.5em;
+}
+
+blockquote {
+    background-color: #e7e7e7;
+    color: #373737;
+    margin: 0.5em;
+    padding: 1.5em 1.5em;
+    border-radius: 10px;  
+}
+
+blockquote p {
+    padding: 0;
+    margin: 0;
+}

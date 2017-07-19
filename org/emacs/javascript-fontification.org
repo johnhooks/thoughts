@@ -1,0 +1,47 @@
+#+TITLE:  Thoughts on JavaScript Fontification in Emacs
+#+AUTHOR: John Hooks
+#+EMAIL:  john@bitmachina.com
+#+DATE:   <2017-07-19 Wed>
+#+STARTUP: indent
+#+STARTUP: hidestars
+
+** Syntax Analysis
+*** =syntax-propertize-extend-region-functions= 
+Abnormal hook to extend the start and end of region before calling
+`syntax-propertize-function'.  The only token that extends beyond a
+newline is a template string.  So I will have to flush the lex cache
+and see if it landed on a template, if so go back to the beginning and
+flush the cache to the beginning of the line on which the template
+started and then repeat the check.  When searching to end, will need
+to track ~`~ pairs and watchout for 
+~`something ${ `weird like ${ this}` }`~
+
+*** JavaScript Template Strings
+Because template strings may span multiple line they could interfere
+with proper syntax analysis and fontification if not handled properly.
+
+**** Concept
+Break up the lexing of template strings on newlines. This would mean
+there could be multiple template string elements between the opening
+and closing delimiters, of either the backquote and/or dollar brace
+pairs. 
+
+- Use the generic string syntax class between the break points.
+- Use the paired delimiter class for the =`=.
+- Caution: Could this cause odd highlighting at the beginning of a
+  line? Because the first character would be the generic string
+  delimiter, it could cause new characters added to the beginning
+  of the line to not be highlighted correctly for a short period
+  of time.
+
+** Considerations 
+If the tokenization of =jove-TEMPLATE= and =jove-JSX-TEXT= end on
+newlines, it should be much easier to create a
+=syntax-propertize-extend-region-function= which does not require an
+analysis of the buffer in order to find START and STOP points. It can
+just flush the parser cache to a saved position and the STOP point can
+end on any line.
+
+I do not know how often syntax-propertize caches. It could be difficult
+to insure the two line up.
+

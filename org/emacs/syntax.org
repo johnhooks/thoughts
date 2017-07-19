@@ -1,0 +1,94 @@
+#+TITLE:  Thoughts on Emacs Syntax Parsing
+#+AUTHOR: John Hooks
+#+EMAIL:  john@bitmachina.com
+#+DATE:   <2017-07-19 Wed>
+#+STARTUP: indent
+#+STARTUP: hidestars
+
+** Introduction
+Emacs syntax analysis is built on the concept of the
+[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Basics.html#Syntax-Basics][syntax-table]]. Each character of the language is assigned a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Class-Table.html#Syntax-Class-Table][syntax
+class]], as well as, possibly multiple [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Flags.html#Syntax-Flags][syntax flags]]. This information is
+use to parse low level syntax constructs such as words, punctuation,
+matched delimiters, strings, and comments. It works well with simple
+strings, though many languages provide a syntax for string
+interpolation. These constructs allow for automatic insertion of
+evaluated expressions. If the expressions are to be fontified
+properly, the contents of the string must be parsed.
+
+Consider this nested JavaScript template string:
+#+begin_src javascript
+
+  `something ${ `weird like ${ this }` }`
+#+end_src
+
+Simply modifying the syntax class of the backqoute character to the
+string class does not provide the desired effect. The string will end
+at the first unescaped backquote. Proper fontification requires a more
+complex syntax analysis.
+
+If provided, the ~syntax-propertize-function~ can set the
+~syntax-table~ text property in order to override a default syntax
+class.
+
+** Custom Syntax Propertization
+The ~syntax-propertize-function~ is given two arguments, the ~START~ and
+~END~ of the text to which the ~syntax-table~ property might need to be
+applied.
+
+Quote from ~syntax.el~
+#+begin_quote
+The specified function may call ~syntax-ppss~ on any position
+before ~END~, but it should not call ~syntax-ppss-flush-cache~,
+which means that it should not call ~syntax-ppss~ on some
+position and later modify the buffer on some earlier position.
+#+end_quote
+
+*** Extending the Propertization Region
+The ~START~ and ~END~ parameters can be adjusted by adding functions
+to the list ~syntax-propertize-extend-region-functions~. The fucntions
+are called with the arguments of ~START~ and ~END~.  If a change is
+necessary, the return value should be a cons of ~(NEW-START
+. NEW-END)~, otherwise return ~nil~. The functions are called
+repeatedly until all return ~nil~.
+
+The default function provided by ~syntax.el~ adjusts ~START~ to the
+beginning of a line and ~END~ to the end of a line. 
+
+Also provided is ~syntax-propertize-multiline~ which checks for
+the ~syntax-multiline~ text property at the beginning and end of
+the region and adjusts the region to extend beyond those elements.
+
+*** Creating Rules
+The macro ~syntax-propertize-rules~ can be used to build a set of
+rules which will be applied to their matching regular expressions.
+
+Quote from ~syntax.el~
+#+begin_quote
+Make a function that applies ~RULES~ for use in ~syntax-propertize-function~.
+The function will scan the buffer, applying the rules where they match.
+The buffer is scanned a single time, like "lex" would, rather than once
+per rule.
+
+Each ~RULE~ can be a symbol, in which case that symbol's value should be,
+at macro-expansion time, a precompiled set of rules, as returned
+by ~syntax-propertize-precompile-rules~.
+
+Otherwise, ~RULE~ should have the form ~(REGEXP HIGHLIGHT1 ... HIGHLIGHTn)~, where
+~REGEXP~ is an expression (evaluated at time of macro-expansion) that returns
+a regexp, and where ~HIGHLIGHTs~ have the form ~(NUMBER SYNTAX)~ which means to
+apply the property ~SYNTAX~ to the chars matched by the subgroup ~NUMBER~
+of the regular expression, if ~NUMBER~ did match.
+~SYNTAX~ is an expression that returns a value to apply as ~syntax-table~
+property.  Some expressions are handled specially:
+- if ~SYNTAX~ is a string, then it is converted with ~string-to-syntax~;
+- if ~SYNTAX~ has the form ~(prog1 EXP . EXPS)~ then the value returned by ~EXP~
+  will be applied to the buffer before running ~EXPS~ and if ~EXP~ is a string it
+  is also converted with ~string-to-syntax~.
+The ~SYNTAX~ expression is responsible to save the ~match-data~ if needed
+for subsequent ~HIGHLIGHTs~.
+Also ~SYNTAX~ is free to move point, in which case ~RULES~ may not be applied to
+some parts of the text or may be applied several times to other parts.
+
+Note: back-references in ~REGEXPs~ do not work.
+#+end_quote

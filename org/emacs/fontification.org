@@ -1,0 +1,198 @@
+#+TITLE:  Thoughts on Emacs Fontification
+#+AUTHOR: John Hooks
+#+EMAIL:  john@bitmachina.com
+#+DATE:   <2017-07-19 Wed>
+#+STARTUP: indent
+#+STARTUP: hidestars
+
+** Emacs Syntactic Fontification Resources
+- [[http://www.lunaryorn.com/posts/syntactic-fontification-in-emacs][Syntactic Fontification in Emacs]] by [[http://www.lunaryorn.com/about/][Sebastian Wiesner]]
+- [[http://www.lunaryorn.com/posts/search-based-fontification-with-keywords][Search-based Fontification with Keywords]] by [[http://www.lunaryorn.com/about/][Sebastian Wiesner]]
+- [[http://www.lunaryorn.com/posts/advanced-syntactic-fontification][Advanced Syntactic Fontification]] by [[http://www.lunaryorn.com/about/][Sebastian Wiesner]]
+- [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Multiline-Font-Lock.html#Multiline-Font-Lock][Multiline Font Lock]] from the Elisp Manual
+
+** Fontification
+Quote from =font-lock.el=
+#+begin_quote
+When Font Lock mode is turned on in a buffer, it (a) fontifies the entire
+buffer and (b) installs one of its fontification functions on one of the
+hook variables that are run by Emacs after every buffer change (i.e., an
+insertion or deletion).  Fontification means the replacement of =face= text
+properties in a given region; Emacs displays text with these =face= text
+properties appropriately.
+#+end_quote
+
+*** Parsing Passes
+Quote from =font-lock.el=
+#+begin_quote
+Fontification normally involves syntactic (i.e., strings and comments) and
+regexp (i.e., keywords and everything else) passes.  There are actually
+three passes; (a) the syntactic keyword pass, (b) the syntactic pass and (c)
+the keyword pass.  Confused?
+#+end_quote
+
+1. Syntax Keyword Pass
+   This passes through a section of the buffer and places =syntax-table=
+   text properties to the buffer according to the list
+   =font-lock-syntactic-keywords=. This should be set in =font-lock-defaults=.
+   The list is to contain syntactic keywords on which to apply syntax...
+
+   *NOTE* Well I just read this is obsolete as of Emacs 24.1, 
+   use the =syntax-propertize-function=.
+   
+2. Syntactic Pass
+   This passes places =face= text properties according to syntactic context.
+   Fontifies strings and comments.
+
+3. Keyword Pass
+   This pass places =face= text properties according to the variable
+   =font-lock-keywords=. These will not match inside a string or comment.
+
+*** =font-lock-fontify-region-function=
+If this function is set it is called in place of the
+=font-lock-default-fontify-region= function. It will be required to
+perform all the necessary steps before attempting to fontify a region.
+
+- It is responsible to call =font-lock-fontify-syntactically-region=
+  This is where =syntax-propertize= is called. If strings and comments
+  are handled by the JavaScript parser, it may not be necessary to call.
+- It may call =font-lock-fontify-keywords-region= to apply search based
+  fontification.
+- It can even return a list of new boundaries for =jit-lock=.
+
+This function can be used for more than fontification. 
+
+#+begin_src emacs-lisp
+(defun font-lock-default-fontify-region (beg end loudly)
+  "Fontify the text between BEG and END.
+If LOUDLY is non-nil, print status messages while fontifying.
+This function is the default `font-lock-fontify-region-function'."
+  (save-buffer-state
+    ;; Use the fontification syntax table, if any.
+    (with-syntax-table (or font-lock-syntax-table (syntax-table))
+      (save-restriction
+        (unless font-lock-dont-widen (widen))
+        ;; Extend the region to fontify so that it starts and ends at
+        ;; safe places.
+        (let ((funs font-lock-extend-region-functions)
+              (font-lock-beg beg)
+              (font-lock-end end))
+          (while funs
+            (setq funs (if (or (not (funcall (car funs)))
+                               (eq funs font-lock-extend-region-functions))
+                           (cdr funs)
+                         ;; If there's been a change, we should go through
+                         ;; the list again since this new position may
+                         ;; warrant a different answer from one of the fun
+                         ;; we've already seen.
+                         font-lock-extend-region-functions)))
+          (setq beg font-lock-beg end font-lock-end))
+        ;; Now do the fontification.
+        (font-lock-unfontify-region beg end)
+        (when (and font-lock-syntactic-keywords
+                   (null syntax-propertize-function))
+          ;; Ensure the beginning of the file is properly syntactic-fontified.
+          (let ((start beg))
+            (when (< font-lock-syntactically-fontified start)
+              (setq start (max font-lock-syntactically-fontified (point-min)))
+              (setq font-lock-syntactically-fontified end))
+            (font-lock-fontify-syntactic-keywords-region start end)))
+        (unless font-lock-keywords-only
+          (font-lock-fontify-syntactically-region beg end loudly))
+        (font-lock-fontify-keywords-region beg end loudly)
+        `(jit-lock-bounds ,beg . ,end)))))
+#+end_src
+
+*NOTE* Can the =font-lock-fontify-keywords-region= be used to apply
+=syntax-table= properties to the text? I believe it could. 
+=font-lock-fontify-syntactically-regon= calls =syntax-propertize=.
+It seems the parse could set both =face= and =syntax-table= properties
+at the same time.
+
+The steps really need to be considered, both fontification and syntax
+parsing need to work together.
+
+Quote from =font-lock.el=
+#+begin_quote
+Rather than the function, e.g., =font-lock-fontify-region= containing the
+code to fontify a region, the function runs the function whose name is the
+value of the variable, e.g., =font-lock-fontify-region-function=.  Normally,
+the value of this variable is, e.g., =font-lock-default-fontify-region=
+which does contain the code to fontify a region.  However, the value of the
+variable could be anything and thus, e.g., =font-lock-fontify-region= could
+do anything.  The indirection of the fontification functions gives major
+modes the capability of modifying the way font-lock.el fontifies.  Major
+modes can modify the values of, e.g., =font-lock-fontify-region-function=,
+via the variable =font-lock-defaults=.
+
+For example, Rmail mode sets the variable =font-lock-defaults= so that
+font-lock.el uses its own function for buffer fontification.  This function
+makes fontification be on a message-by-message basis and so visiting an
+RMAIL file is much faster.  A clever implementation of the function might
+fontify the headers differently than the message body.  (It should, and
+correspondingly for Mail mode, but I can't be bothered to do the work.  Can
+you?)  This hints at a more interesting use...
+
+Languages that contain text normally contained in different major modes
+could define their own fontification functions that treat text differently
+depending on its context.  For example, Perl mode could arrange that here
+docs are fontified differently than Perl code.  Or Yacc mode could fontify
+rules one way and C code another.  Neat!
+
+A further reason to use the fontification indirection feature is when the
+default syntactic fontification, or the default fontification in general,
+is not flexible enough for a particular major mode.  For example, perhaps
+comments are just too hairy for =font-lock-fontify-syntactically-region= to
+cope with.  You need to write your own version of that function, e.g.,
+=hairy-fontify-syntactically-region=, and make your own version of
+=hairy-fontify-region= call that function before calling
+=font-lock-fontify-keywords-region= for the normal regexp fontification
+pass.  And Hairy mode would set =font-lock-defaults= so that font-lock.el
+would call your region fontification function instead of its own.  For
+example, TeX modes could fontify {\foo ...} and \bar{...}  etc. multi-line
+directives correctly and cleanly.  (It is the same problem as fontifying
+multi-line strings and comments; regexps are not appropriate for the job.)
+#+end_quote
+
+*** Syntactic Font Lock
+- first =syntax-propertize-function=
+- second =font-lock-syntax-face-function= with parse state returned from
+  =parse-partial-sexp= should return face.
+
+*** =font-lock-fontify-region-function=
+Quote from =font-lock.el=
+#+begin_quote
+Function to use for fontifying a region.
+It should take two args, the beginning and end of the region, and an optional
+third arg VERBOSE.  If VERBOSE is non-nil, the function should print status
+messages.  This is normally set via `font-lock-defaults'.
+If it fontifies a larger region, it should ideally return a list of the form
+\(jit-lock-bounds BEG . END) indicating the bounds of the region actually
+fontified.
+#+end_quote
+
+*** =font-lock-extend-after-change-region-function=
+Quote from the functions docstring
+#+begin_quote
+A function that determines the region to refontify after a change.
+
+This variable is either nil, or is a function that determines the
+region to refontify after a change.
+It is usually set by the major mode via `font-lock-defaults'.
+Font-lock calls this function after each buffer change.
+
+The function is given three parameters, the standard BEG, END, and OLD-LEN
+from `after-change-functions'.  It should return either a cons of the beginning
+and end buffer positions \(in that order) of the region to refontify, or nil
+\(which directs the caller to fontify a default region).
+This function should preserve the match-data.
+The region it returns may start or end in the middle of a line.")
+(make-variable-buffer-local 'font-lock-extend-after-change-region-function)
+#+end_quote
+
+**** NOTE
+This function is applied after the change and directly before
+=font-lock-fontify-region=. So it could be use to parse the buffer
+and save the approperate data to apply for both syntax and fontification.
+
+

@@ -1,0 +1,30 @@
+{
+  "name": "emacs-notes",
+  "version": "0.1.0",
+  "description": "The Emacs note of John Hooks",
+  "main": "index.js",
+  "repository": {},
+  "scripts": {
+    "css": "postcss src/main.css -c postcss.config.js -o docs/main.css",
+    "start": "webpack-dev-server --open",
+    "build": "webpack"
+  },
+  "author": "John Hooks",
+  "license": "MIT",
+  "dependencies": {
+    "normalize.css": "^7.0.0"
+  },
+  "devDependencies": {
+    "css-loader": "^0.28.4",
+    "extract-text-webpack-plugin": "^3.0.0",
+    "postcss": "^6.0.6",
+    "postcss-cli": "^4.1.0",
+    "postcss-cssnext": "^3.0.2",
+    "postcss-import": "^10.0.0",
+    "postcss-loader": "^2.0.6",
+    "postcss-reporter": "^4.0.0",
+    "style-loader": "^0.18.2",
+    "webpack": "^3.1.0",
+    "webpack-dev-server": "^2.5.1"
+  }
+}

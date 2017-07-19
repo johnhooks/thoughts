@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Thoughts on Emacs Syntax Parsing</title>
+<!-- 2017-07-19 Wed 15:45 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="John Hooks" />
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" type="text/css" href="/style.css" /><script src="/bundle.js"></script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div id="nav"><a href="/">Home</a></div>
+</div>
+<div id="content">
+<h1 class="title">Thoughts on Emacs Syntax Parsing</h1>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Emacs syntax analysis is built on the concept of the
+<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Basics.html#Syntax-Basics">syntax-table</a>. Each character of the language is assigned a <a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Class-Table.html#Syntax-Class-Table">syntax
+class</a>, as well as, possibly multiple <a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Flags.html#Syntax-Flags">syntax flags</a>. This information is
+use to parse low level syntax constructs such as words, punctuation,
+matched delimiters, strings, and comments. It works well with simple
+strings, though many languages provide a syntax for string
+interpolation. These constructs allow for automatic insertion of
+evaluated expressions. If the expressions are to be fontified
+properly, the contents of the string must be parsed.
+</p>
+
+<p>
+Consider this nested JavaScript template string:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-javascript"><span style="color: #CC9393;">`something ${ `</span>weird like ${ <span style="color: #BFEBBF;">this</span> }<span style="color: #CC9393;">` }`</span>
+</pre>
+</div>
+
+<p>
+Simply modifying the syntax class of the backqoute character to the
+string class does not provide the desired effect. The string will end
+at the first unescaped backquote. Proper fontification requires a more
+complex syntax analysis.
+</p>
+
+<p>
+If provided, the <code>syntax-propertize-function</code> can set the
+<code>syntax-table</code> text property in order to override a default syntax
+class.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Custom Syntax Propertization</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+The <code>syntax-propertize-function</code> is given two arguments, the <code>START</code> and
+<code>END</code> of the text to which the <code>syntax-table</code> property might need to be
+applied.
+</p>
+
+<p>
+Quote from <code>syntax.el</code>
+</p>
+<blockquote>
+<p>
+The specified function may call <code>syntax-ppss</code> on any position
+before <code>END</code>, but it should not call <code>syntax-ppss-flush-cache</code>,
+which means that it should not call <code>syntax-ppss</code> on some
+position and later modify the buffer on some earlier position.
+</p>
+</blockquote>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Extending the Propertization Region</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+The <code>START</code> and <code>END</code> parameters can be adjusted by adding functions
+to the list <code>syntax-propertize-extend-region-functions</code>. The fucntions
+are called with the arguments of <code>START</code> and <code>END</code>.  If a change is
+necessary, the return value should be a cons of <code>(NEW-START
+. NEW-END)</code>, otherwise return <code>nil</code>. The functions are called
+repeatedly until all return <code>nil</code>.
+</p>
+
+<p>
+The default function provided by <code>syntax.el</code> adjusts <code>START</code> to the
+beginning of a line and <code>END</code> to the end of a line. 
+</p>
+
+<p>
+Also provided is <code>syntax-propertize-multiline</code> which checks for
+the <code>syntax-multiline</code> text property at the beginning and end of
+the region and adjusts the region to extend beyond those elements.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Creating Rules</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+The macro <code>syntax-propertize-rules</code> can be used to build a set of
+rules which will be applied to their matching regular expressions.
+</p>
+
+<p>
+Quote from <code>syntax.el</code>
+</p>
+<blockquote>
+<p>
+Make a function that applies <code>RULES</code> for use in <code>syntax-propertize-function</code>.
+The function will scan the buffer, applying the rules where they match.
+The buffer is scanned a single time, like "lex" would, rather than once
+per rule.
+</p>
+
+<p>
+Each <code>RULE</code> can be a symbol, in which case that symbol's value should be,
+at macro-expansion time, a precompiled set of rules, as returned
+by <code>syntax-propertize-precompile-rules</code>.
+</p>
+
+<p>
+Otherwise, <code>RULE</code> should have the form <code>(REGEXP HIGHLIGHT1 ... HIGHLIGHTn)</code>, where
+<code>REGEXP</code> is an expression (evaluated at time of macro-expansion) that returns
+a regexp, and where <code>HIGHLIGHTs</code> have the form <code>(NUMBER SYNTAX)</code> which means to
+apply the property <code>SYNTAX</code> to the chars matched by the subgroup <code>NUMBER</code>
+of the regular expression, if <code>NUMBER</code> did match.
+<code>SYNTAX</code> is an expression that returns a value to apply as <code>syntax-table</code>
+property.  Some expressions are handled specially:
+</p>
+<ul class="org-ul">
+<li>if <code>SYNTAX</code> is a string, then it is converted with <code>string-to-syntax</code>;
+</li>
+<li>if <code>SYNTAX</code> has the form <code>(prog1 EXP . EXPS)</code> then the value returned by <code>EXP</code>
+will be applied to the buffer before running <code>EXPS</code> and if <code>EXP</code> is a string it
+is also converted with <code>string-to-syntax</code>.
+</li>
+</ul>
+<p>
+The <code>SYNTAX</code> expression is responsible to save the <code>match-data</code> if needed
+for subsequent <code>HIGHLIGHTs</code>.
+Also <code>SYNTAX</code> is free to move point, in which case <code>RULES</code> may not be applied to
+some parts of the text or may be applied several times to other parts.
+</p>
+
+<p>
+Note: back-references in <code>REGEXPs</code> do not work.
+</p>
+</blockquote>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: John Hooks</p>
+<p class="date">Date: <span class="timestamp-wrapper"><span class="timestamp">&lt;2017-07-19 Wed&gt;</span></span></p>
+<p class="creator">Generated by: <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.2.2 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+</div>
+</body>
+</html>

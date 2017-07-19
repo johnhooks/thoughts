@@ -1,0 +1,8 @@
+#+TITLE:  Thoughts on Emacs Lisps
+#+AUTHOR: John Hooks
+#+EMAIL:  john@bitmachina.com
+#+DATE:   <2017-07-19 Wed>
+
+** Purpose
+   Provide a space for the author to save thoughts regarding 
+   Emacs Lisps for future use by the author and others.

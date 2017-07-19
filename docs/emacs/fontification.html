@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Thoughts on Emacs Fontification</title>
+<!-- 2017-07-19 Wed 15:45 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="John Hooks" />
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" type="text/css" href="/style.css" /><script src="/bundle.js"></script>
+<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+    MathJax.Hub.Config({
+        // Only one of the two following lines, depending on user settings
+        // First allows browser-native MathML display, second forces HTML/CSS
+        //  config: ["MMLorHTML.js"], jax: ["input/TeX"],
+            jax: ["input/TeX", "output/HTML-CSS"],
+        extensions: ["tex2jax.js","TeX/AMSmath.js","TeX/AMSsymbols.js",
+                     "TeX/noUndefined.js"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"], ["\\begin{displaymath}","\\end{displaymath}"] ],
+            skipTags: ["script","noscript","style","textarea","pre","code"],
+            ignoreClass: "tex2jax_ignore",
+            processEscapes: false,
+            processEnvironments: true,
+            preview: "TeX"
+        },
+        showProcessingMessages: true,
+        displayAlign: "center",
+        displayIndent: "2em",
+
+        "HTML-CSS": {
+             scale: 100,
+             availableFonts: ["STIX","TeX"],
+             preferredFont: "TeX",
+             webFont: "TeX",
+             imageFont: "TeX",
+             showMathMenu: true,
+        },
+        MMLorHTML: {
+             prefer: {
+                 MSIE:    "MML",
+                 Firefox: "MML",
+                 Opera:   "HTML",
+                 other:   "HTML"
+             }
+        }
+    });
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div id="nav"><a href="/">Home</a></div>
+</div>
+<div id="content">
+<h1 class="title">Thoughts on Emacs Fontification</h1>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Emacs Syntactic Fontification Resources</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li><a href="http://www.lunaryorn.com/posts/syntactic-fontification-in-emacs">Syntactic Fontification in Emacs</a> by <a href="http://www.lunaryorn.com/about/">Sebastian Wiesner</a>
+</li>
+<li><a href="http://www.lunaryorn.com/posts/search-based-fontification-with-keywords">Search-based Fontification with Keywords</a> by <a href="http://www.lunaryorn.com/about/">Sebastian Wiesner</a>
+</li>
+<li><a href="http://www.lunaryorn.com/posts/advanced-syntactic-fontification">Advanced Syntactic Fontification</a> by <a href="http://www.lunaryorn.com/about/">Sebastian Wiesner</a>
+</li>
+<li><a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Multiline-Font-Lock.html#Multiline-Font-Lock">Multiline Font Lock</a> from the Elisp Manual
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Fontification</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Quote from <code>font-lock.el</code>
+</p>
+<blockquote>
+<p>
+When Font Lock mode is turned on in a buffer, it (a) fontifies the entire
+buffer and (b) installs one of its fontification functions on one of the
+hook variables that are run by Emacs after every buffer change (i.e., an
+insertion or deletion).  Fontification means the replacement of <code>face</code> text
+properties in a given region; Emacs displays text with these <code>face</code> text
+properties appropriately.
+</p>
+</blockquote>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Parsing Passes</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+Quote from <code>font-lock.el</code>
+</p>
+<blockquote>
+<p>
+Fontification normally involves syntactic (i.e., strings and comments) and
+regexp (i.e., keywords and everything else) passes.  There are actually
+three passes; (a) the syntactic keyword pass, (b) the syntactic pass and (c)
+the keyword pass.  Confused?
+</p>
+</blockquote>
+
+<ol class="org-ol">
+<li>Syntax Keyword Pass
+This passes through a section of the buffer and places <code>syntax-table</code>
+text properties to the buffer according to the list
+<code>font-lock-syntactic-keywords</code>. This should be set in <code>font-lock-defaults</code>.
+The list is to contain syntactic keywords on which to apply syntax&#x2026;
+
+<p>
+<b>NOTE</b> Well I just read this is obsolete as of Emacs 24.1, 
+use the <code>syntax-propertize-function</code>.
+</p>
+</li>
+
+<li>Syntactic Pass
+This passes places <code>face</code> text properties according to syntactic context.
+Fontifies strings and comments.
+</li>
+
+<li>Keyword Pass
+This pass places <code>face</code> text properties according to the variable
+<code>font-lock-keywords</code>. These will not match inside a string or comment.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2"><code>font-lock-fontify-region-function</code></h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+If this function is set it is called in place of the
+<code>font-lock-default-fontify-region</code> function. It will be required to
+perform all the necessary steps before attempting to fontify a region.
+</p>
+
+<ul class="org-ul">
+<li>It is responsible to call <code>font-lock-fontify-syntactically-region</code>
+This is where <code>syntax-propertize</code> is called. If strings and comments
+are handled by the JavaScript parser, it may not be necessary to call.
+</li>
+<li>It may call <code>font-lock-fontify-keywords-region</code> to apply search based
+fontification.
+</li>
+<li>It can even return a list of new boundaries for <code>jit-lock</code>.
+</li>
+</ul>
+
+<p>
+This function can be used for more than fontification. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp">(<span style="color: #F0DFAF; font-weight: bold;">defun</span> <span style="color: #93E0E3;">font-lock-default-fontify-region</span> (beg end loudly)
+  <span style="color: #9FC59F;">"Fontify the text between BEG and END.</span>
+<span style="color: #9FC59F;">If LOUDLY is non-nil, print status messages while fontifying.</span>
+<span style="color: #9FC59F;">This function is the default `</span><span style="color: #BFEBBF;">font-lock-fontify-region-function</span><span style="color: #9FC59F;">'."</span>
+  (save-buffer-state
+    <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">Use the fontification syntax table, if any.</span>
+    (<span style="color: #F0DFAF; font-weight: bold;">with-syntax-table</span> (<span style="color: #F0DFAF; font-weight: bold;">or</span> font-lock-syntax-table (syntax-table))
+      (<span style="color: #F0DFAF; font-weight: bold;">save-restriction</span>
+        (<span style="color: #F0DFAF; font-weight: bold;">unless</span> font-lock-dont-widen (widen))
+        <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">Extend the region to fontify so that it starts and ends at</span>
+        <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">safe places.</span>
+        (<span style="color: #F0DFAF; font-weight: bold;">let</span> ((funs font-lock-extend-region-functions)
+              (font-lock-beg beg)
+              (font-lock-end end))
+          (<span style="color: #F0DFAF; font-weight: bold;">while</span> funs
+            (<span style="color: #F0DFAF; font-weight: bold;">setq</span> funs (<span style="color: #F0DFAF; font-weight: bold;">if</span> (<span style="color: #F0DFAF; font-weight: bold;">or</span> (not (funcall (car funs)))
+                               (eq funs font-lock-extend-region-functions))
+                           (cdr funs)
+                         <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">If there's been a change, we should go through</span>
+                         <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">the list again since this new position may</span>
+                         <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">warrant a different answer from one of the fun</span>
+                         <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">we've already seen.</span>
+                         font-lock-extend-region-functions)))
+          (<span style="color: #F0DFAF; font-weight: bold;">setq</span> beg font-lock-beg end font-lock-end))
+        <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">Now do the fontification.</span>
+        (font-lock-unfontify-region beg end)
+        (<span style="color: #F0DFAF; font-weight: bold;">when</span> (<span style="color: #F0DFAF; font-weight: bold;">and</span> font-lock-syntactic-keywords
+                   (null syntax-propertize-function))
+          <span style="color: #5F7F5F;">;; </span><span style="color: #7F9F7F;">Ensure the beginning of the file is properly syntactic-fontified.</span>
+          (<span style="color: #F0DFAF; font-weight: bold;">let</span> ((start beg))
+            (<span style="color: #F0DFAF; font-weight: bold;">when</span> (&lt; font-lock-syntactically-fontified start)
+              (<span style="color: #F0DFAF; font-weight: bold;">setq</span> start (max font-lock-syntactically-fontified (point-min)))
+              (<span style="color: #F0DFAF; font-weight: bold;">setq</span> font-lock-syntactically-fontified end))
+            (font-lock-fontify-syntactic-keywords-region start end)))
+        (<span style="color: #F0DFAF; font-weight: bold;">unless</span> font-lock-keywords-only
+          (font-lock-fontify-syntactically-region beg end loudly))
+        (font-lock-fontify-keywords-region beg end loudly)
+        `(jit-lock-bounds ,beg . ,end)))))
+</pre>
+</div>
+
+<p>
+<b>NOTE</b> Can the <code>font-lock-fontify-keywords-region</code> be used to apply
+<code>syntax-table</code> properties to the text? I believe it could. 
+<code>font-lock-fontify-syntactically-regon</code> calls <code>syntax-propertize</code>.
+It seems the parse could set both <code>face</code> and <code>syntax-table</code> properties
+at the same time.
+</p>
+
+<p>
+The steps really need to be considered, both fontification and syntax
+parsing need to work together.
+</p>
+
+<p>
+Quote from <code>font-lock.el</code>
+</p>
+<blockquote>
+<p>
+Rather than the function, e.g., <code>font-lock-fontify-region</code> containing the
+code to fontify a region, the function runs the function whose name is the
+value of the variable, e.g., <code>font-lock-fontify-region-function</code>.  Normally,
+the value of this variable is, e.g., <code>font-lock-default-fontify-region</code>
+which does contain the code to fontify a region.  However, the value of the
+variable could be anything and thus, e.g., <code>font-lock-fontify-region</code> could
+do anything.  The indirection of the fontification functions gives major
+modes the capability of modifying the way font-lock.el fontifies.  Major
+modes can modify the values of, e.g., <code>font-lock-fontify-region-function</code>,
+via the variable <code>font-lock-defaults</code>.
+</p>
+
+<p>
+For example, Rmail mode sets the variable <code>font-lock-defaults</code> so that
+font-lock.el uses its own function for buffer fontification.  This function
+makes fontification be on a message-by-message basis and so visiting an
+RMAIL file is much faster.  A clever implementation of the function might
+fontify the headers differently than the message body.  (It should, and
+correspondingly for Mail mode, but I can't be bothered to do the work.  Can
+you?)  This hints at a more interesting use&#x2026;
+</p>
+
+<p>
+Languages that contain text normally contained in different major modes
+could define their own fontification functions that treat text differently
+depending on its context.  For example, Perl mode could arrange that here
+docs are fontified differently than Perl code.  Or Yacc mode could fontify
+rules one way and C code another.  Neat!
+</p>
+
+<p>
+A further reason to use the fontification indirection feature is when the
+default syntactic fontification, or the default fontification in general,
+is not flexible enough for a particular major mode.  For example, perhaps
+comments are just too hairy for <code>font-lock-fontify-syntactically-region</code> to
+cope with.  You need to write your own version of that function, e.g.,
+<code>hairy-fontify-syntactically-region</code>, and make your own version of
+<code>hairy-fontify-region</code> call that function before calling
+<code>font-lock-fontify-keywords-region</code> for the normal regexp fontification
+pass.  And Hairy mode would set <code>font-lock-defaults</code> so that font-lock.el
+would call your region fontification function instead of its own.  For
+example, TeX modes could fontify {\foo &#x2026;} and \bar{...}  etc. multi-line
+directives correctly and cleanly.  (It is the same problem as fontifying
+multi-line strings and comments; regexps are not appropriate for the job.)
+</p>
+</blockquote>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Syntactic Font Lock</h3>
+<div class="outline-text-3" id="text-2-3">
+<ul class="org-ul">
+<li>first <code>syntax-propertize-function</code>
+</li>
+<li>second <code>font-lock-syntax-face-function</code> with parse state returned from
+<code>parse-partial-sexp</code> should return face.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4"><code>font-lock-fontify-region-function</code></h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+Quote from <code>font-lock.el</code>
+</p>
+<blockquote>
+<p>
+Function to use for fontifying a region.
+It should take two args, the beginning and end of the region, and an optional
+third arg VERBOSE.  If VERBOSE is non-nil, the function should print status
+messages.  This is normally set via `font-lock-defaults'.
+If it fontifies a larger region, it should ideally return a list of the form
+\(jit-lock-bounds BEG . END) indicating the bounds of the region actually
+fontified.
+</p>
+</blockquote>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5"><code>font-lock-extend-after-change-region-function</code></h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+Quote from the functions docstring
+</p>
+<blockquote>
+<p>
+A function that determines the region to refontify after a change.
+</p>
+
+<p>
+This variable is either nil, or is a function that determines the
+region to refontify after a change.
+It is usually set by the major mode via `font-lock-defaults'.
+Font-lock calls this function after each buffer change.
+</p>
+
+<p>
+The function is given three parameters, the standard BEG, END, and OLD-LEN
+from `after-change-functions'.  It should return either a cons of the beginning
+and end buffer positions \(in that order) of the region to refontify, or nil
+\(which directs the caller to fontify a default region).
+This function should preserve the match-data.
+The region it returns may start or end in the middle of a line.")
+(make-variable-buffer-local 'font-lock-extend-after-change-region-function)
+</p>
+</blockquote>
+</div>
+
+<div id="outline-container-sec-2-5-1" class="outline-4">
+<h4 id="sec-2-5-1">NOTE</h4>
+<div class="outline-text-4" id="text-2-5-1">
+<p>
+This function is applied after the change and directly before
+<code>font-lock-fontify-region</code>. So it could be use to parse the buffer
+and save the approperate data to apply for both syntax and fontification.
+</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: John Hooks</p>
+<p class="date">Date: <span class="timestamp-wrapper"><span class="timestamp">&lt;2017-07-19 Wed&gt;</span></span></p>
+<p class="creator">Generated by: <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.2.2 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+</div>
+</body>
+</html>
