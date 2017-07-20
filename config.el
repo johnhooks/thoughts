@@ -2,6 +2,11 @@
 
 ;; (org-publish "thoughts" t)
 
+(defvar my/thoughts-dev t
+  "Boolean flag to indicate development environment.")
+
+(setq my/thoughts-dev nil)
+
 (defconst my/thoughts-postamble
   (concat "<p class=\"author\">Author: %a</p>\n"
           "<p class=\"date\">Date: %d</p>\n"
@@ -10,18 +15,43 @@
 
 (defconst my/thoughts-head
   (concat "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-          "<link rel=\"stylesheet\" type=\"text/css\" href=\"/style.css\" />"
-          "<script src=\"/bundle.js\"></script>"))
+          (my/thoughts-link
+           "<link rel=\"stylesheet\" type=\"text/css\" href=\"%s\" />"
+           "style.css")
+          (my/thoughts-link
+           "<script src=\"%s\"></script>"
+           "bundle.js")))
+
+(defun my/thoughts-link (format-str str)
+  (format format-str (if my/thoughts-dev
+                         (concat "/" str)
+                       (concat "/thoughts/" str))))
 
 (defun my/thoughts-preamble (_ignore)
   "Return a string containing a preable for the site."
-  (concat "<div id=\"nav\"><a href=\"/\">Home</a></div>"))
+  (my/thoughts-link "<div id=\"nav\"><a href=\"%s\">Home</a></div>"
+                    ""))
+
+(defvar my/thoughts-dir "/Users/johnhooks/Projects/elisp/thoughts/")
+
+(defun my/root-link-follow (path)
+  (org-open-file-with-emacs
+   (concat my/thoughts-dir path)))
+
+(my/root-link-follow "org/emacs/syntax.org")
+
+(defun my/root-link-export (path desc format)
+  (cond
+   ((eq format 'html)
+    (format "<a href=\"%s\">%s</a>"))))
 
 (let* ((dir "/Users/johnhooks/Projects/elisp/thoughts/")
        (public (concat dir "docs/")))
   (setq org-publish-project-alist
         `(
           ("thoughts-org"
+           ;; :html-link-home "thoughts"
+           ;; :html-link-use-abs-url t
            :base-directory ,(concat dir "org/")
            :base-extension "org"
            :publishing-directory ,public
